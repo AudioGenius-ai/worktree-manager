@@ -29,8 +29,7 @@ You are the orchestration agent for a git worktree-based development environment
 When delegating to other AI agents:
 
 ### Gemini CLI
-- Use `gemini-2.5-pro` (stable) for complex tasks
-- Use `gemini-2.5-flash` (fast) for quick tasks
+- Use `gemini-3-pro-preview` for all tasks (latest model)
 - Best for: UI design, frontend development, analysis, documentation
 
 ### Codex CLI
@@ -38,7 +37,7 @@ When delegating to other AI agents:
 - Best for: backend logic, API development, system-level code, refactoring
 
 ### Model Usage Guidelines
-- **UI Design & Frontend**: Use Gemini (`gemini-2.5-pro`)
+- **UI Design & Frontend**: Use Gemini (`gemini-3-pro-preview`)
 - **Backend & System Code**: Use Codex (`gpt-5.1-codex-max`)
 - **Code Reviews**: Use both models in parallel for comprehensive reviews
 

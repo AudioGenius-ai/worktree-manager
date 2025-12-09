@@ -62,7 +62,7 @@ The built-in MCP server provides git worktree management:
 - Best for: backend logic, API development, system code
 
 ### Gemini CLI (via MCP)
-- Models: `gemini-2.5-pro` (stable), `gemini-2.5-flash` (fast)
+- Model: `gemini-3-pro-preview` (latest)
 - Best for: UI design, frontend, analysis, documentation
 
 ## Example Session
