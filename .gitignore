@@ -1,0 +1,4 @@
+.bare-repo/
+worktrees/
+.DS_Store
+node_modules/
