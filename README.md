@@ -1,6 +1,6 @@
 # Worktree Manager
 
-A template for AI-powered parallel development using git worktrees. Clone any repo, work on multiple features simultaneously with Claude, Codex, and Gemini.
+A template for AI-powered parallel development using git worktrees. Work on multiple features simultaneously with Claude, Codex, and Gemini - each in isolated worktrees.
 
 ## Why?
 
@@ -9,55 +9,120 @@ Git worktrees let you have multiple branches checked out at once. Combined with 
 - **Parallelize work**: Multiple agents working on different features simultaneously
 - **Isolate changes**: Each feature in its own directory, no conflicts
 - **Coordinate easily**: Claude orchestrates, delegates to Codex/Gemini as needed
+- **Extend easily**: Add custom MCP tools with the modular server
 
 ## Quick Start
 
 ```bash
 # 1. Clone this template
-git clone https://github.com/audiogenius/worktree-manager.git
+git clone https://github.com/AudioGenius-ai/worktree-manager.git
 cd worktree-manager
 
-# 2. Initialize with your target repo
-./scripts/init-repo.sh https://github.com/your-org/your-repo.git
+# 2. Install dependencies (for MCP server)
+npm install
 
 # 3. Start Claude Code
 claude
 
-# 4. Ask Claude to create worktrees and work on features
+# 4. Initialize with your target repo (Claude will use MCP tools)
+# > Initialize this with https://github.com/your-org/your-repo.git
 ```
 
 ## How It Works
 
-1. **You work from the root** - never `cd` into worktrees manually
-2. **Claude manages worktrees** - creates them for each feature/fix
-3. **Claude delegates** - can assign tasks to Codex or Gemini via MCP
-4. **Each agent gets isolation** - works in their own worktree, no conflicts
+1. **You work from the root** - Claude manages everything
+2. **MCP tools handle git** - worktree creation, commits, pushes
+3. **Claude delegates** - assigns tasks to Codex or Gemini via MCP
+4. **Each agent gets isolation** - works in their own worktree
+
+## MCP Tools
+
+The built-in MCP server provides git worktree management:
+
+| Tool | Description |
+|------|-------------|
+| `git_init_repo` | Initialize with a git repository URL |
+| `git_create_worktree` | Create a new worktree for a branch |
+| `git_list_worktrees` | List all active worktrees |
+| `git_remove_worktree` | Remove a worktree |
+| `git_sync` | Fetch latest from remote |
+| `git_worktree_status` | Get status of a worktree |
+| `git_commit` | Commit changes in a worktree |
+| `git_push` | Push a worktree's branch |
+
+## AI Agents
+
+### Claude Code (Orchestrator)
+- Reads `CLAUDE.md` for instructions
+- Uses MCP tools for worktree management
+- Delegates to other agents as needed
+
+### Codex CLI (via MCP)
+- Model: `gpt-5.1-codex-max`
+- Best for: backend logic, API development, system code
+
+### Gemini CLI (via MCP)
+- Models: `gemini-2.5-pro` (stable), `gemini-2.5-flash` (fast)
+- Best for: UI design, frontend, analysis, documentation
 
 ## Example Session
 
 ```
-You: I need to add user authentication and also fix the login bug
+You: Add user authentication and fix the login styling
 
-Claude: I'll create two worktrees and work on these in parallel.
+Claude: I'll create two worktrees and parallelize this work.
 
-        Creating worktree for feature/auth...
-        Creating worktree for fix/login-bug...
+        [Uses git_create_worktree for feature/auth]
+        [Uses git_create_worktree for fix/login-styling]
 
-        I'll work on the auth feature. Delegating the login bug fix to Codex.
+        I'll handle the auth backend. Delegating the styling to Gemini
+        since it's better for UI work.
 
         [Works on auth in worktrees/feature-auth/]
-        [Codex works on bug in worktrees/fix-login-bug/]
+        [Gemini works on styling in worktrees/fix-login-styling/]
+
+        Both tasks complete. Here's a summary...
 ```
 
-## Scripts
+## Extending the MCP Server
 
-| Script | Description |
-|--------|-------------|
-| `./scripts/init-repo.sh <url>` | Initialize with a git repo |
-| `./scripts/create-worktree.sh <branch>` | Create a new worktree |
-| `./scripts/list-worktrees.sh` | List all worktrees |
-| `./scripts/remove-worktree.sh <name>` | Remove a worktree |
-| `./scripts/sync-worktrees.sh` | Fetch latest from remote |
+Add your own tools by creating modules:
+
+```javascript
+// mcp/modules/mytools.js
+export const myModule = {
+  name: "mytools",
+  description: "My custom tools",
+
+  tools: [
+    {
+      name: "my_custom_tool",
+      description: "Does something useful",
+      inputSchema: {
+        type: "object",
+        properties: {
+          input: { type: "string", description: "Input value" }
+        },
+        required: ["input"]
+      },
+      handler: async ({ input }) => {
+        // Your logic here
+        return { result: input.toUpperCase() };
+      }
+    }
+  ]
+};
+```
+
+Then register it:
+
+```javascript
+// mcp/modules/index.js
+export { gitModule } from "./git.js";
+export { myModule } from "./mytools.js";  // Add this
+```
+
+See `mcp/modules/_template.js` for a complete template with documentation.
 
 ## Structure
 
@@ -65,47 +130,34 @@ Claude: I'll create two worktrees and work on these in parallel.
 worktree-manager/
 ├── .bare-repo/           # Bare git repo (created after init)
 ├── worktrees/            # All worktrees live here
-│   ├── feature-auth/
-│   ├── fix-login-bug/
-│   └── ...
-├── scripts/              # Worktree management
+├── mcp/                  # MCP server
+│   ├── server.js         # Main entry point
+│   └── modules/          # Modular tools
+│       ├── git.js        # Git worktree tools
+│       ├── _template.js  # Template for new modules
+│       └── index.js      # Module exports
+├── scripts/              # Shell script alternatives
 ├── .claude/              # Claude Code config
 │   ├── settings.json     # Permissions
 │   └── agents/           # Agent prompts
-├── .mcp.json             # MCP servers (Codex, Gemini)
+├── .mcp.json             # MCP server definitions
 ├── CLAUDE.md             # Orchestration instructions
-└── README.md
+└── package.json
 ```
 
-## Agent Configuration
+## Testing the MCP Server
 
-### Claude Code (Orchestrator)
-- Reads `CLAUDE.md` for orchestration instructions
-- Has MCP access to Codex and Gemini
-- Manages worktrees and delegates tasks
-
-### Codex CLI (via MCP)
-- Connected as `mcp__codex-cli__codex`
-- Best for: code generation, refactoring
-
-### Gemini CLI (via MCP)
-- Connected as `mcp__gemini-cli__ask-gemini`
-- Best for: analysis, documentation
+```bash
+# Run with MCP Inspector for debugging
+npm run mcp:inspect
+```
 
 ## Prerequisites
 
+- Node.js 18+
 - [Claude Code](https://claude.ai/download) installed
-- [Codex CLI](https://github.com/openai/codex) installed (for delegation)
+- [Codex CLI](https://github.com/openai/codex) (optional, for delegation)
 - Git 2.5+ (for worktree support)
-
-## Customization
-
-Edit these files to customize behavior:
-
-- `CLAUDE.md` - Main orchestration instructions
-- `.claude/settings.json` - Permissions and MCP servers
-- `.claude/agents/*.md` - Specialized agent prompts
-- `.mcp.json` - Add more MCP servers
 
 ## License
 

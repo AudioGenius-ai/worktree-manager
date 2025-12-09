@@ -1,0 +1,25 @@
+{
+  "name": "worktree-manager",
+  "version": "1.0.0",
+  "description": "AI-powered parallel development using git worktrees with Claude, Codex, and Gemini",
+  "type": "module",
+  "main": "mcp/server.js",
+  "scripts": {
+    "mcp": "node mcp/server.js",
+    "mcp:inspect": "npx @modelcontextprotocol/inspector node mcp/server.js"
+  },
+  "keywords": [
+    "mcp",
+    "git",
+    "worktree",
+    "ai",
+    "claude",
+    "codex",
+    "gemini"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.25.0"
+  }
+}

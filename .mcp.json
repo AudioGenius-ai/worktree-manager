@@ -1,5 +1,9 @@
 {
   "mcpServers": {
+    "worktree": {
+      "command": "node",
+      "args": ["mcp/server.js"]
+    },
     "codex-cli": {
       "command": "codex",
       "args": ["mcp-server"]
