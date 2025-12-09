@@ -1,11 +1,12 @@
 # Worktree Manager
 
-A template for AI-powered parallel development using git worktrees. Work on multiple features simultaneously with Claude, Codex, and Gemini - each in isolated worktrees.
+A template for AI-powered parallel development using git worktrees. Manage multiple repositories, work on multiple features simultaneously with Claude, Codex, and Gemini - each in isolated worktrees.
 
 ## Why?
 
 Git worktrees let you have multiple branches checked out at once. Combined with AI agents, you can:
 
+- **Multi-repo support**: Manage multiple repositories from one place
 - **Parallelize work**: Multiple agents working on different features simultaneously
 - **Isolate changes**: Each feature in its own directory, no conflicts
 - **Coordinate easily**: Claude orchestrates, delegates to Codex/Gemini as needed
@@ -24,16 +25,18 @@ npm install
 # 3. Start Claude Code
 claude
 
-# 4. Initialize with your target repo (Claude will use MCP tools)
-# > Initialize this with https://github.com/your-org/your-repo.git
+# 4. Initialize your repos (Claude will use MCP tools)
+# > Initialize myapp from https://github.com/org/myapp.git
+# > Initialize template from https://github.com/org/template.git
 ```
 
 ## How It Works
 
 1. **You work from the root** - Claude manages everything
-2. **MCP tools handle git** - worktree creation, commits, pushes
-3. **Claude delegates** - assigns tasks to Codex or Gemini via MCP
-4. **Each agent gets isolation** - works in their own worktree
+2. **Multi-repo support** - Initialize and work across multiple repos
+3. **MCP tools handle git** - worktree creation, commits, pushes
+4. **Claude delegates** - assigns tasks to Codex or Gemini via MCP
+5. **Each agent gets isolation** - works in their own worktree
 
 ## MCP Tools
 
@@ -41,14 +44,15 @@ The built-in MCP server provides git worktree management:
 
 | Tool | Description |
 |------|-------------|
-| `git_init_repo` | Initialize with a git repository URL |
-| `git_create_worktree` | Create a new worktree for a branch |
-| `git_list_worktrees` | List all active worktrees |
-| `git_remove_worktree` | Remove a worktree |
-| `git_sync` | Fetch latest from remote |
-| `git_worktree_status` | Get status of a worktree |
-| `git_commit` | Commit changes in a worktree |
-| `git_push` | Push a worktree's branch |
+| `git_init_repo` | Initialize a repository: `{ name, url }` |
+| `git_list_repos` | List all initialized repositories |
+| `git_create_worktree` | Create worktree: `{ repo, branch }` |
+| `git_list_worktrees` | List worktrees (optionally filter by repo) |
+| `git_remove_worktree` | Remove worktree: `{ repo, directory }` |
+| `git_sync` | Sync repo(s): `{ repo: "all" }` or specific |
+| `git_worktree_status` | Get status: `{ repo, directory }` |
+| `git_commit` | Commit: `{ repo, directory, message }` |
+| `git_push` | Push: `{ repo, directory }` |
 
 ## AI Agents
 
@@ -68,20 +72,16 @@ The built-in MCP server provides git worktree management:
 ## Example Session
 
 ```
-You: Add user authentication and fix the login styling
+You: Initialize the launchpad and template repos, then add auth to launchpad
 
-Claude: I'll create two worktrees and parallelize this work.
+Claude: I'll initialize both repos and create a worktree for the auth feature.
 
-        [Uses git_create_worktree for feature/auth]
-        [Uses git_create_worktree for fix/login-styling]
+        [Uses git_init_repo for launchpad]
+        [Uses git_init_repo for template]
+        [Uses git_create_worktree { repo: "launchpad", branch: "feature/auth" }]
 
-        I'll handle the auth backend. Delegating the styling to Gemini
-        since it's better for UI work.
-
-        [Works on auth in worktrees/feature-auth/]
-        [Gemini works on styling in worktrees/fix-login-styling/]
-
-        Both tasks complete. Here's a summary...
+        Working on authentication in repos/launchpad/worktrees/feature-auth/
+        ...
 ```
 
 ## Extending the MCP Server
@@ -106,7 +106,6 @@ export const myModule = {
         required: ["input"]
       },
       handler: async ({ input }) => {
-        // Your logic here
         return { result: input.toUpperCase() };
       }
     }
@@ -114,34 +113,31 @@ export const myModule = {
 };
 ```
 
-Then register it:
-
-```javascript
-// mcp/modules/index.js
-export { gitModule } from "./git.js";
-export { myModule } from "./mytools.js";  // Add this
-```
-
-See `mcp/modules/_template.js` for a complete template with documentation.
+Then register it in `mcp/modules/index.js`.
 
 ## Structure
 
 ```
 worktree-manager/
-├── .bare-repo/           # Bare git repo (created after init)
-├── worktrees/            # All worktrees live here
-├── mcp/                  # MCP server
-│   ├── server.js         # Main entry point
-│   └── modules/          # Modular tools
-│       ├── git.js        # Git worktree tools
-│       ├── _template.js  # Template for new modules
-│       └── index.js      # Module exports
-├── scripts/              # Shell script alternatives
-├── .claude/              # Claude Code config
-│   ├── settings.json     # Permissions
-│   └── agents/           # Agent prompts
-├── .mcp.json             # MCP server definitions
-├── CLAUDE.md             # Orchestration instructions
+├── repos/                    # All repositories
+│   ├── myapp/
+│   │   ├── .bare/           # Bare git repo
+│   │   └── worktrees/
+│   │       ├── main/
+│   │       └── feature-auth/
+│   └── template/
+│       ├── .bare/
+│       └── worktrees/
+├── mcp/                      # MCP server
+│   ├── server.js
+│   └── modules/
+│       ├── git.js
+│       ├── _template.js
+│       └── index.js
+├── .claude/
+│   └── settings.json
+├── .mcp.json
+├── CLAUDE.md
 └── package.json
 ```
 

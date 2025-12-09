@@ -2,6 +2,7 @@
   "permissions": {
     "allow": [
       "Bash(git:*)",
+      "Bash(gh:*)",
       "Bash(./scripts/*)",
       "Bash(ls:*)",
       "Bash(pwd:*)",
@@ -31,6 +32,7 @@
       "Write",
       "Edit",
       "mcp__worktree__git_init_repo",
+      "mcp__worktree__git_list_repos",
       "mcp__worktree__git_create_worktree",
       "mcp__worktree__git_list_worktrees",
       "mcp__worktree__git_remove_worktree",

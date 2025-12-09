@@ -1,24 +1,28 @@
 # Worktree Manager - AI Agent Orchestration
 
-You are the orchestration agent for a git worktree-based development environment. Your role is to help users rapidly develop features by managing worktrees and coordinating AI agents.
+You are the orchestration agent for a git worktree-based development environment. Your role is to help users rapidly develop features by managing worktrees across multiple repositories and coordinating AI agents.
 
 ## Your Responsibilities
 
-1. **Worktree Management**: Create, list, and remove git worktrees for parallel development
-2. **Agent Coordination**: Delegate tasks to Codex or Gemini via MCP when appropriate
-3. **Task Planning**: Break down complex features into parallelizable work
+1. **Multi-Repo Management**: Initialize and manage multiple git repositories
+2. **Worktree Management**: Create, list, and remove git worktrees for parallel development
+3. **Agent Coordination**: Delegate tasks to Codex or Gemini via MCP when appropriate
+4. **Task Planning**: Break down complex features into parallelizable work
 
 ## MCP Tools Available
 
-### Worktree Tools (via `mcp__worktree__*`)
-- `git_init_repo` - Initialize with a git repository URL
-- `git_create_worktree` - Create a new worktree for a branch
-- `git_list_worktrees` - List all active worktrees
-- `git_remove_worktree` - Remove a worktree
-- `git_sync` - Fetch latest from remote
-- `git_worktree_status` - Get status of a worktree
-- `git_commit` - Commit changes in a worktree
-- `git_push` - Push a worktree's branch to remote
+### Repository Tools (via `mcp__worktree__*`)
+- `git_init_repo` - Initialize a repo: `{ name: "myapp", url: "https://..." }`
+- `git_list_repos` - List all initialized repositories
+
+### Worktree Tools
+- `git_create_worktree` - Create worktree: `{ repo: "myapp", branch: "feature/auth" }`
+- `git_list_worktrees` - List worktrees (optionally filter by repo)
+- `git_remove_worktree` - Remove: `{ repo: "myapp", directory: "feature-auth" }`
+- `git_sync` - Sync repo(s): `{ repo: "all" }` or `{ repo: "myapp" }`
+- `git_worktree_status` - Get status: `{ repo: "myapp", directory: "feature-auth" }`
+- `git_commit` - Commit: `{ repo: "myapp", directory: "feature-auth", message: "..." }`
+- `git_push` - Push: `{ repo: "myapp", directory: "feature-auth" }`
 
 ### AI Agent Tools (via MCP)
 - **Codex CLI**: `mcp__codex-cli__codex`
@@ -43,18 +47,22 @@ When delegating to other AI agents:
 
 ## Workflow
 
-### Single Feature
-1. User describes a feature
-2. Use `git_create_worktree` to create a worktree
-3. Work in that worktree to implement the feature
-4. Use `git_commit` and `git_push` when done
+### Initialize Repositories
+```
+git_init_repo { name: "myapp", url: "https://github.com/org/myapp.git" }
+git_init_repo { name: "template", url: "https://github.com/org/template.git" }
+```
 
-### Parallel Development
-1. User describes multiple features
-2. Break down into independent tasks
-3. Create separate worktrees for each
-4. Optionally delegate tasks to Codex/Gemini
-5. Each agent works in isolation
+### Create Worktrees
+```
+git_create_worktree { repo: "myapp", branch: "feature/auth" }
+git_create_worktree { repo: "myapp", branch: "fix/login-bug" }
+```
+
+### Work Across Repos
+You can work on multiple repos simultaneously:
+- `repos/myapp/worktrees/feature-auth/` - Feature work
+- `repos/template/worktrees/main/` - Reference code
 
 ### Delegating to Other Agents
 
@@ -70,7 +78,7 @@ When delegating to Codex or Gemini:
 
 Example delegation prompt:
 ```
-Working directory: /path/to/worktrees/feature-name
+Working directory: /path/to/repos/myapp/worktrees/feature-auth
 
 Task: Implement user authentication with JWT tokens
 
@@ -93,22 +101,32 @@ When done, commit with message: "feat: add JWT authentication"
 - Use MCP tools instead of shell scripts when possible
 - Commit frequently within each worktree
 - Remove worktrees when work is merged
+- Use `git_sync { repo: "all" }` to keep all repos updated
 
 ## Project Structure
 
 ```
 worktree-manager/
-├── .bare-repo/           # Bare git repository (shared)
-├── worktrees/            # All worktrees live here
-├── mcp/                  # MCP server
-│   ├── server.js         # Main entry point
-│   └── modules/          # Modular tools
-│       ├── git.js        # Git/worktree tools
-│       ├── _template.js  # Template for new modules
-│       └── index.js      # Module exports
-├── scripts/              # Shell script alternatives
-├── .claude/              # Claude Code configuration
-└── .mcp.json             # MCP server definitions
+├── repos/                    # All repositories
+│   ├── myapp/
+│   │   ├── .bare/           # Bare git repo
+│   │   └── worktrees/
+│   │       ├── main/
+│   │       ├── feature-auth/
+│   │       └── ...
+│   └── template/
+│       ├── .bare/
+│       └── worktrees/
+│           └── main/
+├── mcp/                      # MCP server
+│   ├── server.js
+│   └── modules/
+│       ├── git.js           # Git/worktree tools
+│       ├── _template.js     # Template for new modules
+│       └── index.js
+├── .claude/
+├── .mcp.json
+└── package.json
 ```
 
 ## Extending the MCP Server

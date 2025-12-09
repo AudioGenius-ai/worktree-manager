@@ -1,12 +1,11 @@
 import { execSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = join(__dirname, "..", "..");
-const BARE_REPO = join(ROOT_DIR, ".bare-repo");
-const WORKTREES_DIR = join(ROOT_DIR, "worktrees");
+const REPOS_DIR = join(ROOT_DIR, "repos");
 
 function exec(cmd, cwd = ROOT_DIR) {
   try {
@@ -16,51 +15,102 @@ function exec(cmd, cwd = ROOT_DIR) {
   }
 }
 
-function isInitialized() {
-  return existsSync(BARE_REPO);
+function getRepoDir(repoName) {
+  return join(REPOS_DIR, repoName);
+}
+
+function getBareRepoDir(repoName) {
+  return join(getRepoDir(repoName), ".bare");
+}
+
+function getWorktreesDir(repoName) {
+  return join(getRepoDir(repoName), "worktrees");
+}
+
+function isRepoInitialized(repoName) {
+  return existsSync(getBareRepoDir(repoName));
+}
+
+function listRepos() {
+  if (!existsSync(REPOS_DIR)) return [];
+  return readdirSync(REPOS_DIR, { withFileTypes: true })
+    .filter(d => d.isDirectory() && existsSync(join(REPOS_DIR, d.name, ".bare")))
+    .map(d => d.name);
 }
 
 export const gitModule = {
   name: "git",
-  description: "Git worktree management tools",
+  description: "Git worktree management tools for multiple repositories",
 
   tools: [
     {
       name: "git_init_repo",
-      description: "Initialize the worktree manager with a git repository URL. This clones the repo as a bare repository.",
+      description: "Initialize a repository for worktree management. Each repo gets its own namespace.",
       inputSchema: {
         type: "object",
         properties: {
+          name: {
+            type: "string",
+            description: "Short name for the repo (e.g., 'launchpad', 'myapp')",
+          },
           url: {
             type: "string",
-            description: "Git repository URL (e.g., https://github.com/user/repo.git)",
+            description: "Git repository URL",
           },
         },
-        required: ["url"],
+        required: ["name", "url"],
       },
-      handler: async ({ url }) => {
-        if (isInitialized()) {
-          return { error: "Repository already initialized. Remove .bare-repo to reinitialize." };
+      handler: async ({ name, url }) => {
+        if (isRepoInitialized(name)) {
+          return { error: `Repository '${name}' already initialized.` };
         }
 
-        exec(`git clone --bare "${url}" "${BARE_REPO}"`);
-        exec(`git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"`, BARE_REPO);
-        exec("git fetch origin", BARE_REPO);
+        const repoDir = getRepoDir(name);
+        const bareRepo = getBareRepoDir(name);
+        const worktreesDir = getWorktreesDir(name);
+
+        mkdirSync(repoDir, { recursive: true });
+        mkdirSync(worktreesDir, { recursive: true });
+
+        exec(`git clone --bare "${url}" "${bareRepo}"`);
+        exec(`git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"`, bareRepo);
+        exec("git fetch origin", bareRepo);
 
         return {
           success: true,
-          message: `Repository initialized from ${url}`,
-          bareRepo: BARE_REPO,
+          repo: name,
+          message: `Repository '${name}' initialized from ${url}`,
+          path: repoDir,
+        };
+      },
+    },
+
+    {
+      name: "git_list_repos",
+      description: "List all initialized repositories.",
+      inputSchema: {
+        type: "object",
+        properties: {},
+      },
+      handler: async () => {
+        const repos = listRepos();
+        return {
+          repos,
+          count: repos.length,
         };
       },
     },
 
     {
       name: "git_create_worktree",
-      description: "Create a new git worktree for a branch. If the branch doesn't exist, it will be created from the default branch.",
+      description: "Create a new git worktree for a branch in a specific repository.",
       inputSchema: {
         type: "object",
         properties: {
+          repo: {
+            type: "string",
+            description: "Repository name (e.g., 'launchpad')",
+          },
           branch: {
             type: "string",
             description: "Branch name (e.g., feature/auth, fix/login-bug)",
@@ -70,29 +120,31 @@ export const gitModule = {
             description: "Optional custom directory name (defaults to branch name with / replaced by -)",
           },
         },
-        required: ["branch"],
+        required: ["repo", "branch"],
       },
-      handler: async ({ branch, directory }) => {
-        if (!isInitialized()) {
-          return { error: "Repository not initialized. Run git_init_repo first." };
+      handler: async ({ repo, branch, directory }) => {
+        if (!isRepoInitialized(repo)) {
+          return { error: `Repository '${repo}' not initialized. Run git_init_repo first.` };
         }
 
+        const bareRepo = getBareRepoDir(repo);
+        const worktreesDir = getWorktreesDir(repo);
         const dirName = directory || branch.replace(/\//g, "-");
-        const worktreePath = join(WORKTREES_DIR, dirName);
+        const worktreePath = join(worktreesDir, dirName);
 
         if (existsSync(worktreePath)) {
           return { error: `Worktree already exists at ${worktreePath}` };
         }
 
-        exec("git fetch origin", BARE_REPO);
+        exec("git fetch origin", bareRepo);
 
         const branchExists = (() => {
           try {
-            exec(`git show-ref --verify refs/heads/${branch}`, BARE_REPO);
+            exec(`git show-ref --verify refs/heads/${branch}`, bareRepo);
             return true;
           } catch {
             try {
-              exec(`git show-ref --verify refs/remotes/origin/${branch}`, BARE_REPO);
+              exec(`git show-ref --verify refs/remotes/origin/${branch}`, bareRepo);
               return true;
             } catch {
               return false;
@@ -101,18 +153,19 @@ export const gitModule = {
         })();
 
         if (branchExists) {
-          exec(`git worktree add "${worktreePath}" "${branch}"`, BARE_REPO);
+          exec(`git worktree add "${worktreePath}" "${branch}"`, bareRepo);
         } else {
           let defaultBranch = "main";
           try {
-            defaultBranch = exec("git symbolic-ref refs/remotes/origin/HEAD", BARE_REPO)
+            defaultBranch = exec("git symbolic-ref refs/remotes/origin/HEAD", bareRepo)
               .replace("refs/remotes/origin/", "");
           } catch {}
-          exec(`git worktree add -b "${branch}" "${worktreePath}" "origin/${defaultBranch}"`, BARE_REPO);
+          exec(`git worktree add -b "${branch}" "${worktreePath}" "origin/${defaultBranch}"`, bareRepo);
         }
 
         return {
           success: true,
+          repo,
           branch,
           path: worktreePath,
           message: `Worktree created at ${worktreePath}`,
@@ -122,45 +175,59 @@ export const gitModule = {
 
     {
       name: "git_list_worktrees",
-      description: "List all active git worktrees with their branches and paths.",
+      description: "List all active git worktrees, optionally filtered by repository.",
       inputSchema: {
         type: "object",
-        properties: {},
+        properties: {
+          repo: {
+            type: "string",
+            description: "Optional: filter by repository name",
+          },
+        },
       },
-      handler: async () => {
-        if (!isInitialized()) {
-          return { error: "Repository not initialized. Run git_init_repo first." };
-        }
+      handler: async ({ repo }) => {
+        const repos = repo ? [repo] : listRepos();
+        const allWorktrees = [];
 
-        const output = exec("git worktree list --porcelain", BARE_REPO);
-        const worktrees = [];
-        let current = {};
+        for (const r of repos) {
+          if (!isRepoInitialized(r)) continue;
 
-        for (const line of output.split("\n")) {
-          if (line.startsWith("worktree ")) {
-            if (current.path) worktrees.push(current);
-            current = { path: line.replace("worktree ", "") };
-          } else if (line.startsWith("branch ")) {
-            current.branch = line.replace("branch refs/heads/", "");
-          } else if (line === "bare") {
-            current.isBare = true;
+          const bareRepo = getBareRepoDir(r);
+          const output = exec("git worktree list --porcelain", bareRepo);
+          let current = {};
+
+          for (const line of output.split("\n")) {
+            if (line.startsWith("worktree ")) {
+              if (current.path) allWorktrees.push({ ...current, repo: r });
+              current = { path: line.replace("worktree ", "") };
+            } else if (line.startsWith("branch ")) {
+              current.branch = line.replace("branch refs/heads/", "");
+            } else if (line === "bare") {
+              current.isBare = true;
+            }
           }
+          if (current.path) allWorktrees.push({ ...current, repo: r });
         }
-        if (current.path) worktrees.push(current);
+
+        const worktrees = allWorktrees.filter(w => !w.isBare);
 
         return {
-          worktrees: worktrees.filter(w => !w.isBare),
-          count: worktrees.filter(w => !w.isBare).length,
+          worktrees,
+          count: worktrees.length,
         };
       },
     },
 
     {
       name: "git_remove_worktree",
-      description: "Remove a git worktree by its directory name.",
+      description: "Remove a git worktree.",
       inputSchema: {
         type: "object",
         properties: {
+          repo: {
+            type: "string",
+            description: "Repository name",
+          },
           directory: {
             type: "string",
             description: "Worktree directory name (e.g., feature-auth)",
@@ -170,45 +237,60 @@ export const gitModule = {
             description: "Force removal even if there are uncommitted changes",
           },
         },
-        required: ["directory"],
+        required: ["repo", "directory"],
       },
-      handler: async ({ directory, force }) => {
-        if (!isInitialized()) {
-          return { error: "Repository not initialized." };
+      handler: async ({ repo, directory, force }) => {
+        if (!isRepoInitialized(repo)) {
+          return { error: `Repository '${repo}' not initialized.` };
         }
 
-        const worktreePath = join(WORKTREES_DIR, directory);
+        const bareRepo = getBareRepoDir(repo);
+        const worktreePath = join(getWorktreesDir(repo), directory);
+
         if (!existsSync(worktreePath)) {
           return { error: `Worktree not found: ${worktreePath}` };
         }
 
         const forceFlag = force ? " --force" : "";
-        exec(`git worktree remove "${worktreePath}"${forceFlag}`, BARE_REPO);
+        exec(`git worktree remove "${worktreePath}"${forceFlag}`, bareRepo);
 
         return {
           success: true,
-          message: `Worktree removed: ${directory}`,
+          message: `Worktree removed: ${repo}/${directory}`,
         };
       },
     },
 
     {
       name: "git_sync",
-      description: "Fetch latest changes from the remote repository.",
+      description: "Fetch latest changes from remote for a repository.",
       inputSchema: {
         type: "object",
-        properties: {},
+        properties: {
+          repo: {
+            type: "string",
+            description: "Repository name (or 'all' to sync all repos)",
+          },
+        },
+        required: ["repo"],
       },
-      handler: async () => {
-        if (!isInitialized()) {
-          return { error: "Repository not initialized." };
+      handler: async ({ repo }) => {
+        const repos = repo === "all" ? listRepos() : [repo];
+        const results = [];
+
+        for (const r of repos) {
+          if (!isRepoInitialized(r)) {
+            results.push({ repo: r, error: "Not initialized" });
+            continue;
+          }
+
+          exec("git fetch origin --prune", getBareRepoDir(r));
+          results.push({ repo: r, success: true });
         }
 
-        exec("git fetch origin --prune", BARE_REPO);
-
         return {
-          success: true,
-          message: "Fetched latest changes from remote",
+          results,
+          message: `Synced ${results.filter(r => r.success).length} repos`,
         };
       },
     },
@@ -219,15 +301,19 @@ export const gitModule = {
       inputSchema: {
         type: "object",
         properties: {
+          repo: {
+            type: "string",
+            description: "Repository name",
+          },
           directory: {
             type: "string",
             description: "Worktree directory name",
           },
         },
-        required: ["directory"],
+        required: ["repo", "directory"],
       },
-      handler: async ({ directory }) => {
-        const worktreePath = join(WORKTREES_DIR, directory);
+      handler: async ({ repo, directory }) => {
+        const worktreePath = join(getWorktreesDir(repo), directory);
         if (!existsSync(worktreePath)) {
           return { error: `Worktree not found: ${worktreePath}` };
         }
@@ -250,6 +336,7 @@ export const gitModule = {
         })();
 
         return {
+          repo,
           directory,
           path: worktreePath,
           branch,
@@ -267,6 +354,10 @@ export const gitModule = {
       inputSchema: {
         type: "object",
         properties: {
+          repo: {
+            type: "string",
+            description: "Repository name",
+          },
           directory: {
             type: "string",
             description: "Worktree directory name",
@@ -276,10 +367,10 @@ export const gitModule = {
             description: "Commit message",
           },
         },
-        required: ["directory", "message"],
+        required: ["repo", "directory", "message"],
       },
-      handler: async ({ directory, message }) => {
-        const worktreePath = join(WORKTREES_DIR, directory);
+      handler: async ({ repo, directory, message }) => {
+        const worktreePath = join(getWorktreesDir(repo), directory);
         if (!existsSync(worktreePath)) {
           return { error: `Worktree not found: ${worktreePath}` };
         }
@@ -299,6 +390,7 @@ export const gitModule = {
 
         return {
           success: true,
+          repo,
           commit: hash,
           message: `Committed: ${hash}`,
         };
@@ -311,6 +403,10 @@ export const gitModule = {
       inputSchema: {
         type: "object",
         properties: {
+          repo: {
+            type: "string",
+            description: "Repository name",
+          },
           directory: {
             type: "string",
             description: "Worktree directory name",
@@ -320,10 +416,10 @@ export const gitModule = {
             description: "Set upstream tracking (use for new branches)",
           },
         },
-        required: ["directory"],
+        required: ["repo", "directory"],
       },
-      handler: async ({ directory, setUpstream }) => {
-        const worktreePath = join(WORKTREES_DIR, directory);
+      handler: async ({ repo, directory, setUpstream }) => {
+        const worktreePath = join(getWorktreesDir(repo), directory);
         if (!existsSync(worktreePath)) {
           return { error: `Worktree not found: ${worktreePath}` };
         }
@@ -335,6 +431,7 @@ export const gitModule = {
 
         return {
           success: true,
+          repo,
           message: `Pushed ${branch} to remote`,
         };
       },
