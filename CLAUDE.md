@@ -252,6 +252,21 @@ Provide findings in the Security Audit Report format.
    req_create { type: "feature", title: "User authentication", description: "..." }
    ```
 
+   **IMPORTANT: Always ask clarifying questions before creating requirements.**
+
+   Before creating any requirement, gather enough information by asking:
+   - What problem is this solving? Who is the user?
+   - What are the acceptance criteria? How will we know it's done?
+   - Are there any constraints (technical, time, budget)?
+   - What's the priority relative to other work?
+   - Are there dependencies on other features or systems?
+   - What's out of scope for this requirement?
+
+   Use `req_add_question` to document any open questions that need answers:
+   ```
+   req_add_question { reqId: "FEAT-001", question: "Should this support offline mode?" }
+   ```
+
 2. **Create a task for the work**:
    ```
    task_create { title: "Implement JWT auth", description: "...", priority: "P1" }
