@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 
 import { createInterface } from "node:readline";
-import { gitModule } from "./modules/index.js";
+import { gitModule, githubModule, tasksModule, requirementsModule } from "./modules/index.js";
 
 const SERVER_NAME = "worktree-manager";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "2.0.0";
 const PROTOCOL_VERSION = "2024-11-05";
 
 // Register all modules
-const modules = [gitModule];
+const modules = [gitModule, githubModule, tasksModule, requirementsModule];
 
 // Build tools list from all modules
 const allTools = modules.flatMap((m) =>

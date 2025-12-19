@@ -436,5 +436,109 @@ export const gitModule = {
         };
       },
     },
+
+    {
+      name: "git_pull",
+      description: "Pull latest changes from remote into a worktree.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          repo: {
+            type: "string",
+            description: "Repository name",
+          },
+          directory: {
+            type: "string",
+            description: "Worktree directory name",
+          },
+          rebase: {
+            type: "boolean",
+            description: "Use rebase instead of merge (default: false)",
+          },
+        },
+        required: ["repo", "directory"],
+      },
+      handler: async ({ repo, directory, rebase = false }) => {
+        const worktreePath = join(getWorktreesDir(repo), directory);
+        if (!existsSync(worktreePath)) {
+          return { error: `Worktree not found: ${worktreePath}` };
+        }
+
+        const branch = exec("git branch --show-current", worktreePath);
+        const rebaseFlag = rebase ? " --rebase" : "";
+
+        try {
+          exec(`git pull${rebaseFlag}`, worktreePath);
+        } catch (err) {
+          if (err.message.includes("no tracking information")) {
+            exec(`git pull origin ${branch}${rebaseFlag}`, worktreePath);
+          } else {
+            throw err;
+          }
+        }
+
+        const hash = exec("git rev-parse --short HEAD", worktreePath);
+
+        return {
+          success: true,
+          repo,
+          branch,
+          head: hash,
+          message: `Pulled latest changes for ${branch}`,
+        };
+      },
+    },
+
+    {
+      name: "git_reset",
+      description: "Reset a worktree to match remote branch (discards local changes).",
+      inputSchema: {
+        type: "object",
+        properties: {
+          repo: {
+            type: "string",
+            description: "Repository name",
+          },
+          directory: {
+            type: "string",
+            description: "Worktree directory name",
+          },
+          hard: {
+            type: "boolean",
+            description: "Hard reset (discards all local changes). Default: false (soft reset)",
+          },
+        },
+        required: ["repo", "directory"],
+      },
+      handler: async ({ repo, directory, hard = false }) => {
+        const worktreePath = join(getWorktreesDir(repo), directory);
+        if (!existsSync(worktreePath)) {
+          return { error: `Worktree not found: ${worktreePath}` };
+        }
+
+        const branch = exec("git branch --show-current", worktreePath);
+
+        exec("git fetch origin", worktreePath);
+
+        if (hard) {
+          exec(`git reset --hard origin/${branch}`, worktreePath);
+        } else {
+          exec(`git reset origin/${branch}`, worktreePath);
+        }
+
+        const hash = exec("git rev-parse --short HEAD", worktreePath);
+
+        return {
+          success: true,
+          repo,
+          branch,
+          head: hash,
+          hard,
+          message: hard
+            ? `Hard reset ${branch} to origin/${branch} (local changes discarded)`
+            : `Soft reset ${branch} to origin/${branch} (changes unstaged)`,
+        };
+      },
+    },
   ],
 };

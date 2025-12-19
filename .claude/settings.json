@@ -40,10 +40,104 @@
       "mcp__worktree__git_worktree_status",
       "mcp__worktree__git_commit",
       "mcp__worktree__git_push",
+      "mcp__worktree__git_pull",
+      "mcp__worktree__git_reset",
+      "mcp__worktree__github_*",
+      "mcp__worktree__task_*",
+      "mcp__worktree__req_*",
       "mcp__codex-cli__codex",
       "mcp__gemini-cli__ask-gemini"
     ],
     "deny": []
   },
-  "enableAllProjectMcpServers": true
+  "enableAllProjectMcpServers": true,
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/task-completion-gate.js",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/task-completion-gate.js",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-task-reminder.js",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/dangerous-command-blocker.js",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__worktree__git_create_worktree",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/workflow-task-tracking.js",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/requirement-enforcement.js",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__worktree__git_init_repo",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/requirement-enforcement.js",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/workflow-task-tracking.js",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
 }
