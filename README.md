@@ -26,10 +26,27 @@ npm install
 claude
 ```
 
-Then initialize your repos:
+### Add Existing Projects
+
+Bring in repos you're already working on:
 ```
 git_init_repo { name: "myapp", url: "https://github.com/org/myapp.git" }
+git_init_repo { name: "backend", url: "https://github.com/org/backend.git" }
 ```
+
+This clones them as bare repos and sets up the worktree structure. Your code lives in `repos/myapp/worktrees/main/`.
+
+### Or Start Fresh
+
+Create a new repo from scratch:
+```
+mkdir -p repos/mynewproject/worktrees/main
+cd repos/mynewproject/worktrees/main
+git init
+# ... create your project
+```
+
+Then push to GitHub and use `git_init_repo` to set up the bare repo structure.
 
 ## How It Works
 
@@ -192,6 +209,47 @@ Located in `.claude/settings.json`:
     "Stop": [{ "hooks": [{ "command": "node .claude/hooks/task-completion-gate.js" }] }]
   }
 }
+```
+
+## Multi-Model Delegation
+
+Claude acts as the orchestrator and can delegate to other AI models via MCP:
+
+### Codex CLI
+```
+mcp__codex-cli__codex {
+  prompt: "Implement the auth middleware in this worktree",
+  cwd: "/path/to/repos/myapp/worktrees/feature-auth"
+}
+```
+- Best for: Backend logic, API development, system-level code, refactoring
+
+### Gemini CLI
+```
+mcp__gemini-cli__ask-gemini {
+  prompt: "Review this React component for accessibility issues",
+  model: "gemini-2.5-pro"
+}
+```
+- Best for: UI design, frontend code, analysis, documentation
+
+### Delegation Patterns
+
+**Parallel reviews** - Run multiple models on the same code:
+```
+Review repos/myapp/worktrees/feature-auth/src/auth/
+
+1. Use Gemini for UI/UX review
+2. Use Codex for backend logic review
+3. Use security-auditor agent for security check
+```
+
+**Specialized tasks** - Route to the right model:
+```
+For this feature:
+- Delegate UI components to Gemini
+- Delegate API handlers to Codex
+- I'll orchestrate and review
 ```
 
 ## Agent Templates

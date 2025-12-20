@@ -10,7 +10,8 @@ An MCP server (47 tools) that gives Claude:
 - Git worktree management (parallel feature development)
 - Task & requirements tracking (enforced traceability)
 - GitHub integration (PRs, issues, branches)
-- Agent delegation patterns
+- Multi-model delegation (Codex, Gemini via MCP)
+- Agent templates for specialized tasks
 - Hooks that enforce workflow
 
 ## Setup
@@ -19,19 +20,22 @@ An MCP server (47 tools) that gives Claude:
 git clone https://github.com/AudioGenius-ai/worktree-manager.git my-project
 cd my-project
 npm install
+claude
 ```
 
-The `.mcp.json` is already configured:
-```json
-{
-  "mcpServers": {
-    "worktree": {
-      "command": "node",
-      "args": ["mcp/server.js"]
-    }
-  }
-}
+### Add Your Existing Projects
+
+Bring in repos you're already working on:
 ```
+git_init_repo { name: "myapp", url: "https://github.com/you/myapp.git" }
+git_init_repo { name: "backend", url: "https://github.com/you/backend.git" }
+```
+
+This clones them as bare repos and sets up the worktree structure. Your code lives in `repos/myapp/worktrees/main/`.
+
+### Or Start Fresh
+
+Create new projects directly in the `repos/` directory and push to GitHub.
 
 ## How I Actually Use It
 
@@ -100,6 +104,38 @@ task_add_note, task_link_worktree, task_current
 req_create, req_link_task, req_add_question
 req_generate_spec, req_traceability
 ```
+
+---
+
+## Multi-Model Delegation
+
+Claude acts as the orchestrator and can delegate to Codex and Gemini via MCP:
+
+**Codex CLI** (backend, APIs, system code):
+```
+mcp__codex-cli__codex {
+  prompt: "Implement the rate limiting middleware",
+  cwd: "/path/to/repos/myapp/worktrees/feature-ratelimit"
+}
+```
+
+**Gemini CLI** (UI, frontend, documentation):
+```
+mcp__gemini-cli__ask-gemini {
+  prompt: "Review this React component for accessibility",
+  model: "gemini-2.5-pro"
+}
+```
+
+**Example delegation prompt:**
+```
+For this feature:
+- Delegate the API endpoints to Codex
+- Delegate the React components to Gemini
+- I'll orchestrate and review the integration
+```
+
+This lets you run multiple AI models in parallel on different parts of your codebase.
 
 ---
 
