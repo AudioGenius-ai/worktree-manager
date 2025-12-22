@@ -125,6 +125,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "mcp__worktree__task_complete",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/task-complete-blocker.js",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -135,6 +145,28 @@
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/workflow-task-tracking.js",
             "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__worktree__task_code_complete",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/quality-gate-trigger.js",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if command -v osascript >/dev/null 2>&1; then osascript -e 'display notification \"Input required\" with title \"Claude Code\" sound name \"Ping\"'; elif command -v notify-send >/dev/null 2>&1; then notify-send -u critical 'Claude Code' 'Input required'; fi",
+            "timeout": 5
           }
         ]
       }
